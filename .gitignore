@@ -1,5 +1,5 @@
 .idea
-__pycache__/*
-xentinuator/__pycache__/*
-xentinuator/midihandler/pycache/*
-xentinuator/recorder/pycache/*
+__pycache__/
+xentinuator/__pycache__/
+xentinuator/midihandler/pycache/
+xentinuator/recorder/pycache/
