@@ -1,6 +1,5 @@
 import rtmidi
-import inquirer
-from .recorder.recorder import Recorder
+from xentinuator.recorder.recorder import Recorder
 
 
 class MidiHandler(object):
@@ -12,6 +11,7 @@ class MidiHandler(object):
         self.__midi_out = rtmidi.MidiOut()
         self.__outport_names = self.__midi_out.get_ports()
         self.__recorder = Recorder()
+        self.__recordings = []
 
     def get_midi_port_names(self):
         return {
@@ -44,15 +44,21 @@ class MidiHandler(object):
 
     def stop_recording(self):
         print("Ending recording")
-        self.__recorder.end_recording()
+        recording = self.__recorder.end_recording()
+        self.__recordings.append(recording)
 
-    def get_recording(self):
-        return self.__recorder.get_recording()
+    def get_recording(self, index=-1):
+        return self.__recordings[index]
 
-    def play_recording(self):
-        recording = self.get_recording()
-        for msg in recording.play():
-            self.__midi_out.send_message(msg.bytes())
+    def get_recordings(self):
+        return self.__recordings
+
+    def play_recording(self, midi):
+        try:
+            for msg in midi.play():
+                self.__midi_out.send_message(msg.bytes())
+        except KeyboardInterrupt:
+            return
 
     def exit(self):
         del self.__midi_out
