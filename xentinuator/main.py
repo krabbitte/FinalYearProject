@@ -1,15 +1,8 @@
+import mido
 from midihandler.midi_handler import MidiHandler
-from datetime import datetime
+from utilities.utilities import wait_for_input, mido_to_music21, music21_to_mido
 import inquirer
-from readchar import readkey, key
-
-
-def wait_for_input(*keys):
-    while True:
-        user_input = readkey()
-        for i in keys:
-            if user_input == i:
-                return i
+from readchar import key
 
 
 class Xentinuator(object):
@@ -31,29 +24,43 @@ class Xentinuator(object):
         answers = inquirer.prompt(questions)
         return [answers['input_port'], answers['output_port']]
 
-    def __call__(self):
+    def file_mode(self):
+        inport_name, outport_name = self.user_prompt_ports()
+        self.midi_handler.set_ports(inport_name, outport_name)
+        self.midi_handler.open_ports()
+
+        midi = mido.MidiFile('./midi_files/b.mid')
+        mf = mido_to_music21(midi)
+        midi = music21_to_mido(mf)
+
+        self.midi_handler.play_recording(midi)
+
+    def interactive_mode(self):
         inport_name, outport_name = self.user_prompt_ports()
         self.midi_handler.set_ports(inport_name, outport_name)
         self.midi_handler.open_ports()
         while True:
+            # start recording
             print('press [space] to start recording or [c] to exit')
             user_input = wait_for_input(key.SPACE, 'c')
             if user_input == key.SPACE:
                 self.midi_handler.start_recording()
             elif user_input == 'c':
                 break
-
+            # end recording
             print('press [space] to stop recording')
             user_input = wait_for_input(key.SPACE)
             if user_input == key.SPACE:
                 self.midi_handler.stop_recording()
             midi = self.midi_handler.get_recording()
-
+            mf = mido_to_music21(midi)
+            # pass music21 representation to MGS
+            midi = music21_to_mido(mf)
             self.midi_handler.play_recording(midi)
-
         self.midi_handler.exit()
 
 
 if __name__ == '__main__':
     xen = Xentinuator()
-    xen()
+    # xen.interactive_mode()
+    xen.file_mode()

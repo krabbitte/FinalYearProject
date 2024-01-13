@@ -1,3 +1,4 @@
+import mido
 import rtmidi
 from xentinuator.recorder.recorder import Recorder
 
@@ -37,6 +38,10 @@ class MidiHandler(object):
         self.__open_out_port(self.__outport_name)
         self.__midi_in.set_callback(self.__recorder, data=self.__midi_out)
         self.__open_in_port(self.__inport_name)
+
+    def load_file(self):
+        midi_file = mido.MidiFile('testfile.mid')
+        self.__recordings.append(midi_file)
 
     def start_recording(self):
         print("Starting recording")
