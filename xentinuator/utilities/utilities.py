@@ -1,10 +1,20 @@
 import io
 import mido
 import music21
+import argparse
 from readchar import readkey
 
 
-@staticmethod
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-mode", help="interactive, file, test.", type=str, required=True)
+    parser.add_argument("-training_path", help="Path of the training corpus.", type=str, required=False)
+    parser.add_argument("-saved_graphs_path", help="Path to previously trained graphs", type=str, required=False)
+    parser.add_argument("-input_file", help="Path to an input file used to generate music.", type=str, required=False)
+    args = parser.parse_args()
+    return args
+
+
 def wait_for_input(*keys):
     while True:
         user_input = readkey()
@@ -13,7 +23,6 @@ def wait_for_input(*keys):
                 return i
 
 
-@staticmethod
 def mido_to_music21(midi):
     f = io.BytesIO()
     midi.save(file=f)
@@ -22,7 +31,6 @@ def mido_to_music21(midi):
     return mf
 
 
-@staticmethod
 def music21_to_mido(mf):
     mf = music21.midi.translate.streamToMidiFile(mf)
     mf_bytes = mf.writestr()

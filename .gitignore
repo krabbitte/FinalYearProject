@@ -3,3 +3,6 @@ __pycache__/
 xentinuator/__pycache__/
 xentinuator/midihandler/pycache/
 xentinuator/recorder/pycache/
+xentinuator/mgs/pycache/
+midi_files/training_corpus/*
+saved_graphs/*

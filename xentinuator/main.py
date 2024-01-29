@@ -1,13 +1,17 @@
-import mido
+import music21.stream
 from midihandler.midi_handler import MidiHandler
-from utilities.utilities import wait_for_input, mido_to_music21, music21_to_mido
+from utilities.utilities import wait_for_input, mido_to_music21, music21_to_mido, get_args
 import inquirer
 from readchar import key
+from mgs.mgs import MGS
+from mgs.constants import EDO
 
 
 class Xentinuator(object):
-    def __init__(self):
+    def __init__(self, training_path, saved_graphs_path):
         self.midi_handler = MidiHandler()
+        self.training_path = training_path
+        self.saved_graphs_path = saved_graphs_path
 
     def user_prompt_ports(self):
         port_names = self.midi_handler.get_midi_port_names()
@@ -24,21 +28,28 @@ class Xentinuator(object):
         answers = inquirer.prompt(questions)
         return [answers['input_port'], answers['output_port']]
 
-    def file_mode(self):
+    def get_inputs(self):
+        # Get input/output ports
         inport_name, outport_name = self.user_prompt_ports()
         self.midi_handler.set_ports(inport_name, outport_name)
         self.midi_handler.open_ports()
 
-        midi = mido.MidiFile('./midi_files/b.mid')
-        mf = mido_to_music21(midi)
-        midi = music21_to_mido(mf)
-
+    def file_mode(self, input_file):
+        self.get_inputs()
+        # Create MGS
+        mgs = MGS(EDO.EDO_12, EDO.EDO_22)
+        mgs.init_source_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
+        mgs.print_graph()
+        # Get input file
+        mf = music21.converter.parseFile(input_file)
+        # Generate output
+        output = mgs(mf, EDO.EDO_12)
+        midi = music21_to_mido(output)
+        # Play output
         self.midi_handler.play_recording(midi)
 
     def interactive_mode(self):
-        inport_name, outport_name = self.user_prompt_ports()
-        self.midi_handler.set_ports(inport_name, outport_name)
-        self.midi_handler.open_ports()
+        self.get_inputs()
         while True:
             # start recording
             print('press [space] to start recording or [c] to exit')
@@ -53,14 +64,35 @@ class Xentinuator(object):
             if user_input == key.SPACE:
                 self.midi_handler.stop_recording()
             midi = self.midi_handler.get_recording()
-            mf = mido_to_music21(midi)
+            # mf = mido_to_music21(midi)
             # pass music21 representation to MGS
-            midi = music21_to_mido(mf)
+            # midi = music21_to_mido(mf)
             self.midi_handler.play_recording(midi)
         self.midi_handler.exit()
 
+    def test_mode(self):
+        self.get_inputs()
+        # Create MGS
+        mgs = MGS(EDO.EDO_12, EDO.EDO_22)
+        mgs.init_source_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
+        mgs.print_graph()
+        # Create input
+        mf = music21.stream.Stream()
+        mf.append(music21.note.Note('C4'))
+        mf.append(music21.note.Note('E4'))
+        # Generate output
+        output = mgs(mf, EDO.EDO_12)
+        midi = music21_to_mido(output)
+        # Play output
+        self.midi_handler.play_recording(midi)
+
 
 if __name__ == '__main__':
-    xen = Xentinuator()
-    # xen.interactive_mode()
-    xen.file_mode()
+    args = get_args()
+    xen = Xentinuator(args.training_path, args.saved_graphs_path)
+    if args.mode == 'interactive':
+        xen.interactive_mode()
+    elif args.mode == 'file':
+        xen.file_mode(args.input_file)
+    elif args.mode == 'test':
+        xen.test_mode()
