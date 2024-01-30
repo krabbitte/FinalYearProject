@@ -6,3 +6,4 @@ xentinuator/recorder/pycache/
 xentinuator/mgs/pycache/
 midi_files/training_corpus/*
 saved_graphs/*
+midi_files/*.mid

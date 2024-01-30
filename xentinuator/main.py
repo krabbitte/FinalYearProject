@@ -28,14 +28,14 @@ class Xentinuator(object):
         answers = inquirer.prompt(questions)
         return [answers['input_port'], answers['output_port']]
 
-    def get_inputs(self):
+    def get_ports(self):
         # Get input/output ports
         inport_name, outport_name = self.user_prompt_ports()
         self.midi_handler.set_ports(inport_name, outport_name)
         self.midi_handler.open_ports()
 
     def file_mode(self, input_file):
-        self.get_inputs()
+        self.get_ports()
         # Create MGS
         mgs = MGS(EDO.EDO_12, EDO.EDO_22)
         mgs.init_source_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
@@ -49,7 +49,7 @@ class Xentinuator(object):
         self.midi_handler.play_recording(midi)
 
     def interactive_mode(self):
-        self.get_inputs()
+        self.get_ports()
         while True:
             # start recording
             print('press [space] to start recording or [c] to exit')
@@ -71,7 +71,7 @@ class Xentinuator(object):
         self.midi_handler.exit()
 
     def test_mode(self):
-        self.get_inputs()
+        self.get_ports()
         # Create MGS
         mgs = MGS(EDO.EDO_12, EDO.EDO_22)
         mgs.init_source_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
