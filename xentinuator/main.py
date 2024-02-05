@@ -75,7 +75,7 @@ class Xentinuator(object):
         # Create MGS
         mgs = MGS(EDO.EDO_12, EDO.EDO_22)
         mgs.init_source_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
-        mgs.print_graph()
+        # mgs.print_graph()
         # Create input
         mf = music21.stream.Stream()
         mf.append(music21.note.Note('C4'))

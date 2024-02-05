@@ -1,6 +1,6 @@
 import os
 import random
-
+import copy
 import music21.converter
 
 
@@ -8,87 +8,86 @@ class Node(object):
     def __init__(self, m21_object=None, name=''):
         self.name = name
         self.object = m21_object
-        self.children = {}
+        self.links = {}
+        self.link_freq = {}
 
     def __str__(self):
-        out = ''
-        stack = [[-1, self]]
-        while len(stack) > 0:
-            level, item = stack.pop()
-            out += ' '*level + (str(item.object.pitch) if item.object is not None else '') + '\n'
-            for _, value in item.children.items():
-                stack.append([level + 1, value])
-        return out
+        return self.name
+
+    def rand_next(self):
+        if len(self.links.values()) == 0:
+            return None
+        probabilities = {}
+        total = sum(self.link_freq.values())
+        for key, value in self.link_freq.items():
+            probabilities[key] = value/total
+        key = random.choices(list(probabilities.keys()), weights=probabilities.values())
+        return self.links[key[0]]
+
+
+def get_index(list, item):
+    for i in range(list):
+        if item == list[i]:
+            return i
+    return -1
+
+
+def get_sequence_name(seq):
+    name = ''
+    for i in range(len(seq)):
+        name += seq[i].fullName + (' | ' if i < len(seq) - 1 else '')
+    return name
 
 
 class Graph(object):
     def __init__(self, edo):
         self.edo = edo
         self.__max_rest_duration = 1.5
-        self.root_node = Node(name='root')
+        self.m21_objects = None
+        self.order = 4
+        self.nodes = {}
 
-    def init_graph(self, training_path='./midi_files/training_corpus/'):
+    def init_graph(self, training_path='./midi_files/training_corpus/wikifonia/'):
         files = os.listdir(training_path)
         for i in range(0, int(len(files))):
             test_file = training_path + '\\' + files[i]
             print('processesing: ', files[i])
-            self.process_file(test_file)
+            mf = music21.converter.parseFile(test_file)
+            self.process_file(mf)
 
-    def process_file(self, file_path):
-        mf = music21.converter.parseFile(file_path)
-        m21_objects = mf.flatten().recurse()
-        stack = m21_objects.getElementsByClass(['Note', 'Rest']).stream()
-        current_node = self.root_node
-        try:
-            while len(stack) > 0:
-                m21_object = stack.pop(0)
-                if m21_object.classes[0] == 'Note':
-                    # check children of object for pitch
-                    while str(m21_object.pitch)[:-1] in current_node.children:
-                        # progress graph phrase
-                        current_node = current_node.children[str(m21_object.pitch)[:-1]]
-                        # get next note
-                        m21_object = stack.pop(0)
-                        rest_duration = 0
-                        while m21_object.classes[0] == 'Rest':
-                            m21_object = stack.pop(0)
-                            rest_duration += m21_object.duration.quarterLength.real
-                        if rest_duration > self.__max_rest_duration:
-                            current_node = self.root_node
-                    # progressed to leaf - add note
-                    if str(m21_object.pitch)[:-1] not in current_node.children:
-                        current_node.children[str(m21_object.pitch)[:-1]] = Node(m21_object)
-                        current_node = current_node.children[str(m21_object.pitch)[:-1]]
-                elif m21_object.classes[0] == 'Rest':
-                    rest_duration = 0
-                    while m21_object.classes[0] == 'Rest':
-                        m21_object = stack.pop(0)
-                        rest_duration += m21_object.duration.quarterLength.real
-                    if rest_duration > self.__max_rest_duration:
-                        current_node = self.root_node
-        except IndexError:
-            pass
+    def process_file(self, mf):
+        self.m21_objects = mf.flatten().recurse().getElementsByClass(['Note', 'Chord']).stream()
+        for i in range(0, len(self.m21_objects)):
+            j = i
+            while j >= 0 and j > i - self.order:
+                # get sequence
+                seq = self.m21_objects[j:i + 1]
+                sequence_name = get_sequence_name(seq)
+                # get next note
+                if i == len(self.m21_objects) - 1:
+                    break
+                s = self.m21_objects[i + 1]
+                # create node for sequence
+                if sequence_name not in self.nodes:
+                    self.nodes[sequence_name] = Node(seq, sequence_name)
+                # create node for following note
+                if s.fullName not in self.nodes:
+                    self.nodes[s.fullName] = Node([s], s.fullName)
+                # create link in sequence for next note or increment frequency
+                if s.fullName not in self.nodes[sequence_name].links:
+                    self.nodes[sequence_name].links[s.fullName] = self.nodes[s.fullName]
+                    self.nodes[sequence_name].link_freq[s.fullName] = 1
+                else:
+                    self.nodes[sequence_name].link_freq[s.fullName] += 1
+                j -= 1
 
     def traverse_tree(self, mf):
-        m21_stack = mf.flatten().recurse().getElementsByClass(['Note']).stream()
-
-        phrase = music21.stream.Stream()
-        current_node = self.root_node
-        while len(m21_stack) > 0:
-            m21_object = m21_stack.pop(0)
-            if str(m21_object.pitch)[:-1] in current_node.children:
-                if current_node.object is not None:
-                    phrase.append(current_node.object)
-                current_node = current_node.children[str(m21_object.pitch)[:-1]]
-            else:
-                break
-
-        while len(list(current_node.children.values())) > 0:
-            current_node = random.choice(list(current_node.children.values()))
-            phrase.append(current_node.object)
-
-        return phrase
+        out = music21.stream.Stream()
+        note = random.choice(list(self.nodes.values()))
+        while note is not None:
+            out.append(copy.deepcopy(note.object))
+            note = note.rand_next()
+        return out
 
     def print_graph(self):
-        print(self.root_node)
-
+        print(self.nodes)
