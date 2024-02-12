@@ -2,6 +2,7 @@ import os
 import random
 import copy
 import music21.converter
+from ..utilities.utilities import transpose_stream
 
 
 class Node(object):
@@ -15,47 +16,40 @@ class Node(object):
         return self.name
 
     def rand_next(self):
-        if len(self.links.values()) == 0:
+        if len(list(self.links.values())) == 0:
             return None
+        # Calculate probabilities based on frequency
         probabilities = {}
         total = sum(self.link_freq.values())
         for key, value in self.link_freq.items():
             probabilities[key] = value/total
-        key = random.choices(list(probabilities.keys()), weights=probabilities.values())
+        # Choose link based on distribution
+        key = random.choices(list(probabilities.keys()), weights=list(probabilities.values()))
         return self.links[key[0]]
 
 
-def get_index(list, item):
-    for i in range(list):
-        if item == list[i]:
-            return i
-    return -1
-
-
-def get_sequence_name(seq):
-    name = ''
-    for i in range(len(seq)):
-        name += seq[i].fullName + (' | ' if i < len(seq) - 1 else '')
-    return name
-
-
 class Graph(object):
-    def __init__(self, edo):
+    def __init__(self, edo, key='C'):
         self.edo = edo
         self.__max_rest_duration = 1.5
         self.m21_objects = None
         self.order = 4
+        self.key = key
         self.nodes = {}
 
     def init_graph(self, training_path='./midi_files/training_corpus/wikifonia/'):
         files = os.listdir(training_path)
         for i in range(0, int(len(files))):
-            test_file = training_path + '\\' + files[i]
             print('processesing: ', files[i])
+            test_file = training_path + '\\' + files[i]
             mf = music21.converter.parseFile(test_file)
-            self.process_file(mf)
+            mf = transpose_stream(mf, self.key)
+            self.__process_file(mf)
 
-    def process_file(self, mf):
+    def update_graph(self, mf):
+        self.__process_file(mf)
+
+    def __process_file(self, mf):
         self.m21_objects = mf.flatten().recurse().getElementsByClass(['Note', 'Chord']).stream()
         for i in range(0, len(self.m21_objects)):
             j = i
@@ -82,12 +76,21 @@ class Graph(object):
                 j -= 1
 
     def traverse_tree(self, mf):
-        out = music21.stream.Stream()
+        output = music21.stream.Stream()
+        # find mf sequence in self.nodes or closest equivalent and bias probabilities
         note = random.choice(list(self.nodes.values()))
         while note is not None:
-            out.append(copy.deepcopy(note.object))
+            output.append(copy.deepcopy(note.object))
             note = note.rand_next()
-        return out
+        return output
 
     def print_graph(self):
         print(self.nodes)
+
+
+def get_sequence_name(seq):
+    name = ''
+    for i in range(len(seq)):
+        name += seq[i].fullName + (' | ' if i < len(seq) - 1 else '')
+    return name
+

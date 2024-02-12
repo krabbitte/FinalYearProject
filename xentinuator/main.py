@@ -38,7 +38,7 @@ class Xentinuator(object):
         self.get_ports()
         # Create MGS
         mgs = MGS(EDO.EDO_12, EDO.EDO_22)
-        mgs.init_source_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
+        mgs.init_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
         mgs.print_graph()
         # Get input file
         mf = music21.converter.parseFile(input_file)
@@ -74,8 +74,8 @@ class Xentinuator(object):
         self.get_ports()
         # Create MGS
         mgs = MGS(EDO.EDO_12, EDO.EDO_22)
-        mgs.init_source_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
-        # mgs.print_graph()
+        mgs.init_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
+        mgs.print_graph()
         # Create input
         mf = music21.stream.Stream()
         mf.append(music21.note.Note('C4'))
