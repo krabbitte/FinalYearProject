@@ -75,11 +75,13 @@ class Xentinuator(object):
         # Create MGS
         mgs = MGS(EDO.EDO_12, EDO.EDO_22)
         mgs.init_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
-        mgs.print_graph()
+        # mgs.print_graph()
         # Create input
         mf = music21.stream.Stream()
         mf.append(music21.note.Note('C4'))
         mf.append(music21.note.Note('E4'))
+        mf.append(music21.note.Note('G4'))
+        mf.append(music21.chord.Chord(['C4', 'E4', 'G4']))
         # Generate output
         output = mgs(mf, EDO.EDO_12)
         midi = music21_to_mido(output)

@@ -16,7 +16,7 @@ class MGS(object):
 
     def init_graph(self, training_path, saved_graphs_path):
         if saved_graphs_path is None:
-            self.__graph = Graph(edo=self.__source_edo, key='D')
+            self.__graph = Graph(edo=self.__source_edo, key='C')
             self.__graph.init_graph(training_path)
             self.__save_graph()
         else:
@@ -29,7 +29,6 @@ class MGS(object):
             pickle.dump(self.__graph, f, pickle.HIGHEST_PROTOCOL)
 
     def __generate(self, mf):
-        self.__graph.update_graph(mf)
         return self.__graph.traverse_tree(mf)
 
     def print_graph(self):
@@ -38,6 +37,8 @@ class MGS(object):
     def __call__(self, mf, target_edo=None):
         # Update Markov Chain with data from new phrase
         self.__graph.update_graph(mf)
+        # Bias graph
+        self.__graph.bias_graph()
         # Generate output
         output = self.__generate(mf)
         return output

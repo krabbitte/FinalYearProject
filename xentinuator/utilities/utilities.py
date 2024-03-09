@@ -26,7 +26,6 @@ def wait_for_input(*keys):
 def transpose_stream(mf, target_key):
     notes = mf.flatten().recurse().getElementsByClass(['Note']).stream()
     key = notes.analyze('key')
-    print(key.tonic)
     interval = music21.interval.Interval(key.tonic, music21.pitch.Pitch(target_key))
     mf = mf.transpose(interval)
     return mf
