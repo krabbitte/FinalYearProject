@@ -1,94 +1,143 @@
 import os
 import random
-
+import copy
+import re
 import music21.converter
+from pprint import pprint
+from ..utilities.utilities import transpose_stream
 
 
 class Node(object):
-    def __init__(self, m21_object=None, name=''):
+    def __init__(self, name, m21_object=None):
         self.name = name
         self.object = m21_object
-        self.children = {}
+        self.links = {}
+        self.link_freq = {}
 
     def __str__(self):
-        out = ''
-        stack = [[-1, self]]
-        while len(stack) > 0:
-            level, item = stack.pop()
-            out += ' '*level + (str(item.object.pitch) if item.object is not None else '') + '\n'
-            for _, value in item.children.items():
-                stack.append([level + 1, value])
-        return out
+        return ''.join(self.name)
+
+    def rand_next(self):
+        if len(list(self.links.values())) == 0:
+            return None
+        # Calculate probabilities based on frequency
+        probabilities = {}
+        total = sum(self.link_freq.values())
+        for key, value in self.link_freq.items():
+            probabilities[key] = value/total
+        # Choose link based on distribution
+        key = random.choices(list(probabilities.keys()), weights=list(probabilities.values()))
+        return self.links[key[0]]
 
 
 class Graph(object):
-    def __init__(self, edo):
+    def __init__(self, edo, key='C'):
         self.edo = edo
-        self.__max_rest_duration = 1.5
-        self.root_node = Node(name='root')
+        self.order = 4
+        self.key = key
+        self.phrase_memory = []
+        self.nodes = {}
 
-    def init_graph(self, training_path='./midi_files/training_corpus/'):
+    def init_graph(self, training_path='./midi_files/training_corpus/wikifonia/'):
         files = os.listdir(training_path)
         for i in range(0, int(len(files))):
-            test_file = training_path + '\\' + files[i]
             print('processesing: ', files[i])
-            self.process_file(test_file)
+            test_file = training_path + '\\' + files[i]
+            mf = music21.converter.parseFile(test_file)
+            mf = transpose_stream(mf, self.key)
+            self.__process_file(mf)
 
-    def process_file(self, file_path):
-        mf = music21.converter.parseFile(file_path)
-        m21_objects = mf.flatten().recurse()
-        stack = m21_objects.getElementsByClass(['Note', 'Rest']).stream()
-        current_node = self.root_node
-        try:
-            while len(stack) > 0:
-                m21_object = stack.pop(0)
-                if m21_object.classes[0] == 'Note':
-                    # check children of object for pitch
-                    while str(m21_object.pitch)[:-1] in current_node.children:
-                        # progress graph phrase
-                        current_node = current_node.children[str(m21_object.pitch)[:-1]]
-                        # get next note
-                        m21_object = stack.pop(0)
-                        rest_duration = 0
-                        while m21_object.classes[0] == 'Rest':
-                            m21_object = stack.pop(0)
-                            rest_duration += m21_object.duration.quarterLength.real
-                        if rest_duration > self.__max_rest_duration:
-                            current_node = self.root_node
-                    # progressed to leaf - add note
-                    if str(m21_object.pitch)[:-1] not in current_node.children:
-                        current_node.children[str(m21_object.pitch)[:-1]] = Node(m21_object)
-                        current_node = current_node.children[str(m21_object.pitch)[:-1]]
-                elif m21_object.classes[0] == 'Rest':
-                    rest_duration = 0
-                    while m21_object.classes[0] == 'Rest':
-                        m21_object = stack.pop(0)
-                        rest_duration += m21_object.duration.quarterLength.real
-                    if rest_duration > self.__max_rest_duration:
-                        current_node = self.root_node
-        except IndexError:
-            pass
+    def update_graph(self, mf):
+        mf = transpose_stream(mf, self.key)
+        self.__process_file(mf)
+        self.phrase_memory.append(mf)
+
+    def __process_file(self, mf):
+        m21_objects = mf.flatten().recurse().getElementsByClass(['Note', 'Chord']).stream()
+        print('Length: ', len(m21_objects))
+        for i in range(0, len(m21_objects)):
+            print('processing ', i)
+            j = i
+            while j >= 0 and j > i - self.order:
+                # get sequence
+                seq = m21_objects[j:i + 1]
+                sequence_name = get_sequence_name(seq)
+                # create node for sequence
+                if sequence_name not in self.nodes:
+                    self.nodes[sequence_name] = Node(sequence_name, seq)
+                # get next note
+                if i == len(m21_objects) - 1:
+                    break
+                s = m21_objects[i + 1]
+                s_name = get_sequence_name([s])
+                # create node for following note
+                if s_name not in self.nodes:
+                    self.nodes[s_name] = Node(s_name, [s])
+                # create link in sequence for next note or increment frequency
+                if s.fullName not in self.nodes[sequence_name].links:
+                    self.nodes[sequence_name].links[s_name] = self.nodes[s_name]
+                    self.nodes[sequence_name].link_freq[s_name] = 1
+                else:
+                    self.nodes[sequence_name].link_freq[s_name] += 1
+                j -= 1
+
+    def bias_graph(self):
+        for node in list(self.nodes.values()):
+            for phrase in self.phrase_memory:
+                notes = phrase.flatten().recurse().getElementsByClass(['Note', 'Chord']).stream()
+                for note in notes:
+                    if note.fullName in node.link_freq:
+                        node.link_freq[note.fullName] *= 2
 
     def traverse_tree(self, mf):
-        m21_stack = mf.flatten().recurse().getElementsByClass(['Note']).stream()
+        mf = transpose_stream(mf, self.key)
+        name = get_sequence_name(mf)
+        sub_sequences = []
+        for i in range(0, len(name)):
+            j = i
+            while j >= 0 and j > i - self.order:
+                sub_sequences.append(name[j:i + 1])
+                j -= 1
 
-        phrase = music21.stream.Stream()
-        current_node = self.root_node
-        while len(m21_stack) > 0:
-            m21_object = m21_stack.pop(0)
-            if str(m21_object.pitch)[:-1] in current_node.children:
-                if current_node.object is not None:
-                    phrase.append(current_node.object)
-                current_node = current_node.children[str(m21_object.pitch)[:-1]]
-            else:
-                break
+        output = music21.stream.Stream()
 
-        while len(list(current_node.children.values())) > 0:
-            current_node = random.choice(list(current_node.children.values()))
-            phrase.append(current_node.object)
+        # find mf sequence in self.nodes or closest equivalent
+        i = 0
+        note = None
+        while note is None and i < len(sub_sequences):
+            sub_sequence = random.choice(sub_sequences)
+            if sub_sequence in self.nodes:
+                note = self.nodes[sub_sequence]
+            i += 1
 
-        return phrase
+        if note is None:
+            note = random.choice(self.nodes.values())
+
+        max_length = mf.quarterLength * 10
+        current_length = 0
+        while current_length < max_length and note is not None:
+            for note_object in note.object:
+                current_length += note_object.quarterLength
+            output.append(copy.deepcopy(note.object))
+            note = note.rand_next()
+        return output
 
     def print_graph(self):
-        print(self.root_node)
+        print(self.nodes)
+
+
+def get_sequence_name(seq, include_note_value=True):
+    output = []
+    for i in range(len(seq)):
+        name = seq[i].fullName
+        if not include_note_value:
+            if isinstance(seq[i], music21.chord.Chord):
+                delim = '}'
+                name = re.split(r'}', name, maxsplit=1)[0] + delim
+                print(name)
+            elif isinstance(seq[i], music21.note.Note):
+                name = seq[i].fullName
+                name = re.split(r'(?<=\d)\D', name, maxsplit=1)[0]
+        output.append(name)
+    return tuple(output)
 
