@@ -50,12 +50,16 @@ class Xentinuator(object):
 
     def interactive_mode(self):
         self.get_ports()
+        mgs = MGS(EDO.EDO_12, EDO.EDO_12)
+        mgs.init_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
         while True:
             # start recording
-            print('press [space] to start recording or [c] to exit')
+            print('[space] to start recording - [x] to save graph - [c] to exit')
             user_input = wait_for_input(key.SPACE, 'c')
             if user_input == key.SPACE:
                 self.midi_handler.start_recording()
+            elif user_input == 'x':
+                mgs.save_graph()
             elif user_input == 'c':
                 break
             # end recording
@@ -64,9 +68,11 @@ class Xentinuator(object):
             if user_input == key.SPACE:
                 self.midi_handler.stop_recording()
             midi = self.midi_handler.get_recording()
-            # mf = mido_to_music21(midi)
+            mf = mido_to_music21(midi)
+            print(mf.show('text'))
             # pass music21 representation to MGS
-            # midi = music21_to_mido(mf)
+            output = mgs(mf, EDO.EDO_12)
+            midi = music21_to_mido(output)
             self.midi_handler.play_recording(midi)
         self.midi_handler.exit()
 
@@ -75,13 +81,15 @@ class Xentinuator(object):
         # Create MGS
         mgs = MGS(EDO.EDO_12, EDO.EDO_22)
         mgs.init_graph(training_path=self.training_path, saved_graphs_path=self.saved_graphs_path)
-        # mgs.print_graph()
         # Create input
         mf = music21.stream.Stream()
         mf.append(music21.note.Note('C4'))
         mf.append(music21.note.Note('E4'))
         mf.append(music21.note.Note('G4'))
         mf.append(music21.chord.Chord(['C4', 'E4', 'G4']))
+        mf.append(music21.note.Note('G4'))
+        mf.append(music21.note.Note('E4'))
+        mf.append(music21.note.Note('C4'))
         # Generate output
         output = mgs(mf, EDO.EDO_12)
         midi = music21_to_mido(output)
