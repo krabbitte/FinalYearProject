@@ -2,7 +2,17 @@ import io
 import mido
 import music21
 import argparse
+from xentinuator.mgs.constants import EDO
 from readchar import readkey
+
+
+def int_to_edo(num):
+    edos = {
+        12: EDO.EDO_12,
+        22: EDO.EDO_22,
+        31: EDO.EDO_31
+    }
+    return edos[num]
 
 
 def get_args():
@@ -11,7 +21,11 @@ def get_args():
     parser.add_argument("-training_path", help="Path of the training corpus.", type=str, required=False)
     parser.add_argument("-saved_graphs_path", help="Path to previously trained graphs", type=str, required=False)
     parser.add_argument("-input_file", help="Path to an input file used to generate music.", type=str, required=False)
+    parser.add_argument("-source_edo", help="Source tuning system.", default=12, type=int, required=False)
+    parser.add_argument("-target_edo", help="Target number of divisions of the octave.", default=12, type=int, required=False)
     args = parser.parse_args()
+    args.source_edo = int_to_edo(args.source_edo)
+    args.target_edo = int_to_edo(args.target_edo)
     return args
 
 
